@@ -5,7 +5,8 @@ import { store } from '@/store/store';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, View, DeviceEventEmitter } from 'react-native';
+import { LicenseExpiredOverlay } from '@/modules/auth/components/LicenseExpiredOverlay';
 import * as SecureStore from 'expo-secure-store';
 import { useAppDispatch } from '@/store/hooks';
 import { setToken, setFullSession, logout } from '@/modules/auth/authSlice';
@@ -20,6 +21,10 @@ function AppInitializer({ children }: { children: React.ReactNode }) {
   const [isReady, setIsReady] = useState(false);
   const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
   const isSellerAuthenticated = useAppSelector((state) => state.auth.isSellerAuthenticated);
+
+  const [licenseExpired, setLicenseExpired] = useState<{ isExpired: boolean; message?: string }>({
+    isExpired: false,
+  });
 
   useEffect(() => {
     async function initializeAuth() {
@@ -94,8 +99,20 @@ function AppInitializer({ children }: { children: React.ReactNode }) {
     }
   }, [isReady, isAuthenticated, isSellerAuthenticated, segments]);
 
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener('LICENSE_EXPIRED', (event: any) => {
+      setLicenseExpired({
+        isExpired: true,
+        message: event?.message,
+      });
+    });
+
+    return () => subscription.remove();
+  }, []);
+
   return (
     <View style={{ flex: 1 }}>
+      {licenseExpired.isExpired && <LicenseExpiredOverlay message={licenseExpired.message} />}
       {children}
       {!isReady && (
         <View

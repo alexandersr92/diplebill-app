@@ -6,7 +6,8 @@ import {
   Pressable,
   ActivityIndicator,
   ScrollView,
-  Alert
+  Alert,
+  Modal
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Header from '@/components/Header';
@@ -15,10 +16,12 @@ import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
   fetchCashSettingsAndSession,
   openCashSession,
-  closeCashSession
+  closeCashSession,
+  addCashTransaction
 } from '@/modules/billing/cashSlice';
 import { clearSellerSession } from '@/modules/auth/authSlice';
-import { ShieldCheck, Calendar, User, LayoutGrid, Coins, AlertCircle } from 'lucide-react-native';
+import { ShieldCheck, Calendar, User, LayoutGrid, Coins, AlertCircle, PlusCircle, ArrowUpCircle, ArrowDownCircle } from 'lucide-react-native';
+import { getExpenseCategoriesApi } from '@/modules/billing/services/expenseCategoryService';
 
 export default function CashScreen() {
   const dispatch = useAppDispatch();
@@ -35,13 +38,25 @@ export default function CashScreen() {
   const [openingError, setOpeningError] = useState<string | null>(null);
   const [isOpeningCash, setIsOpeningCash] = useState(false);
   const [actualCash, setActualCash] = useState('');
+  const [actualUsd, setActualUsd] = useState('');
   const [notes, setNotes] = useState('');
+
+  // Transaction Modal
+  const [isTxModalVisible, setIsTxModalVisible] = useState(false);
+  const [txType, setTxType] = useState<'in' | 'out'>('out');
+  const [txAmount, setTxAmount] = useState('');
+  const [txCurrency, setTxCurrency] = useState<'NIO' | 'USD'>('NIO');
+  const [txDescription, setTxDescription] = useState('');
+  const [txCategoryId, setTxCategoryId] = useState<string | null>(null);
+  const [expenseCategories, setExpenseCategories] = useState<{id: string; name: string}[]>([]);
+  const [isSubmittingTx, setIsSubmittingTx] = useState(false);
 
   // Cargar sesión al montar o cuando cambie sucursal
   useEffect(() => {
     if (storeId) {
       dispatch(fetchCashSettingsAndSession(storeId));
     }
+    getExpenseCategoriesApi().then(res => setExpenseCategories(res.data || [])).catch(console.warn);
   }, [dispatch, storeId]);
 
   const handleOpenCash = async () => {
@@ -95,12 +110,14 @@ export default function CashScreen() {
                 closeCashSession({
                   cashSessionId: activeSession.id,
                   actualCash: cash,
+                  actualUsd: Number(actualUsd) || 0,
                   notes,
                   storeId
                 })
               ).unwrap();
               Alert.alert('Caja Cerrada', '¡La sesión de caja se cerró exitosamente!');
               setActualCash('');
+              setActualUsd('');
               setNotes('');
             }
           } catch (err: any) {
@@ -109,6 +126,43 @@ export default function CashScreen() {
         }
       }
     ]);
+  };
+
+  const handleRegisterTx = async () => {
+    const amt = Number(txAmount);
+    if (isNaN(amt) || amt <= 0) {
+      Alert.alert('Error', 'Ingresa un monto válido.');
+      return;
+    }
+    if (!txDescription.trim()) {
+      Alert.alert('Error', 'Ingresa una descripción o motivo.');
+      return;
+    }
+    if (txType === 'out' && !txCategoryId) {
+      Alert.alert('Error', 'Selecciona una categoría de gasto.');
+      return;
+    }
+    setIsSubmittingTx(true);
+    try {
+      await dispatch(addCashTransaction({
+        cashSessionId: activeSession!.id,
+        type: txType,
+        amount: amt,
+        currency: txCurrency,
+        expense_category_id: txType === 'out' ? txCategoryId : null,
+        description: txDescription.trim(),
+        storeId
+      })).unwrap();
+      Alert.alert('Éxito', 'Movimiento registrado correctamente.');
+      setIsTxModalVisible(false);
+      setTxAmount('');
+      setTxDescription('');
+      setTxCategoryId(null);
+    } catch (err: any) {
+      Alert.alert('Error', err || 'No se pudo registrar.');
+    } finally {
+      setIsSubmittingTx(false);
+    }
   };
 
   if (isLoading && !activeSession) {
@@ -297,6 +351,15 @@ export default function CashScreen() {
                 </View>
               </View>
 
+              {/* Acciones Rápidas */}
+              <Pressable
+                onPress={() => setIsTxModalVisible(true)}
+                className="bg-blue-600/10 dark:bg-blue-500/20 border border-blue-200 dark:border-blue-900/50 p-4 rounded-2xl flex-row items-center justify-center gap-2 active:opacity-70"
+              >
+                <PlusCircle size={20} color={colorScheme === 'dark' ? '#60a5fa' : '#2563eb'} />
+                <Text className="text-blue-700 dark:text-blue-400 font-bold text-sm">Registrar Gasto o Ingreso Extra</Text>
+              </Pressable>
+
               {/* Formulario de Cierre */}
               <View className="bg-white dark:bg-white/10 p-5 rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm dark:shadow-none">
                 <Text className="text-slate-500 dark:text-white/80 text-xs font-semibold uppercase tracking-wider mb-3">
@@ -304,11 +367,23 @@ export default function CashScreen() {
                 </Text>
 
                 <View className="mb-4">
-                  <Text className="text-slate-500 dark:text-white/60 text-xs mb-1.5 ml-1">Efectivo Real en Caja</Text>
+                  <Text className="text-slate-500 dark:text-white/60 text-xs mb-1.5 ml-1">Efectivo Real en Caja (C$)</Text>
                   <TextInput
                     value={actualCash}
                     onChangeText={setActualCash}
-                    placeholder="Monto total contado"
+                    placeholder="Monto total contado en C$"
+                    placeholderTextColor={colorScheme === 'dark' ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)'}
+                    keyboardType="numeric"
+                    className="bg-slate-50 dark:bg-white/10 text-slate-900 dark:text-white px-4 py-3 rounded-xl border border-slate-200 dark:border-white/10 text-base"
+                  />
+                </View>
+
+                <View className="mb-4">
+                  <Text className="text-slate-500 dark:text-white/60 text-xs mb-1.5 ml-1">Dólares Físicos en Caja (USD)</Text>
+                  <TextInput
+                    value={actualUsd}
+                    onChangeText={setActualUsd}
+                    placeholder="Monto total contado en $"
                     placeholderTextColor={colorScheme === 'dark' ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)'}
                     keyboardType="numeric"
                     className="bg-slate-50 dark:bg-white/10 text-slate-900 dark:text-white px-4 py-3 rounded-xl border border-slate-200 dark:border-white/10 text-base"
@@ -346,6 +421,101 @@ export default function CashScreen() {
           </View>
         </View>
       </ScrollView>
+
+      {/* Modal de Transacción (Ajuste/Gasto) */}
+      <Modal visible={isTxModalVisible} transparent animationType="slide">
+        <View className="flex-1 bg-black/50 justify-end">
+          <View className="bg-white dark:bg-slate-900 p-6 rounded-t-3xl min-h-[60%]">
+            <Text className="text-lg font-black text-slate-900 dark:text-white mb-4">Registrar Movimiento</Text>
+            
+            <View className="flex-row gap-2 mb-4">
+              <Pressable
+                onPress={() => setTxType('out')}
+                className={`flex-1 py-3 items-center rounded-xl border-2 ${txType === 'out' ? 'border-red-500 bg-red-50 dark:bg-red-900/20' : 'border-slate-200 dark:border-slate-800'}`}
+              >
+                <ArrowDownCircle size={20} color={txType === 'out' ? '#ef4444' : '#94a3b8'} />
+                <Text className={`font-bold mt-1 ${txType === 'out' ? 'text-red-600 dark:text-red-400' : 'text-slate-500'}`}>Gasto / Salida</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setTxType('in')}
+                className={`flex-1 py-3 items-center rounded-xl border-2 ${txType === 'in' ? 'border-green-500 bg-green-50 dark:bg-green-900/20' : 'border-slate-200 dark:border-slate-800'}`}
+              >
+                <ArrowUpCircle size={20} color={txType === 'in' ? '#22c55e' : '#94a3b8'} />
+                <Text className={`font-bold mt-1 ${txType === 'in' ? 'text-green-600 dark:text-green-400' : 'text-slate-500'}`}>Ingreso Extra</Text>
+              </Pressable>
+            </View>
+
+            <ScrollView className="flex-1">
+              <View className="mb-4 flex-row gap-2">
+                <View className="flex-1">
+                  <Text className="text-xs font-bold text-slate-600 dark:text-slate-400 mb-1">Monto</Text>
+                  <TextInput
+                    value={txAmount}
+                    onChangeText={setTxAmount}
+                    keyboardType="numeric"
+                    placeholder="0.00"
+                    placeholderTextColor="#94a3b8"
+                    className="bg-slate-50 dark:bg-slate-800 px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-bold"
+                  />
+                </View>
+                <View className="w-24">
+                  <Text className="text-xs font-bold text-slate-600 dark:text-slate-400 mb-1">Moneda</Text>
+                  <Pressable
+                    onPress={() => setTxCurrency(txCurrency === 'NIO' ? 'USD' : 'NIO')}
+                    className="bg-slate-50 dark:bg-slate-800 px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 items-center justify-center"
+                  >
+                    <Text className="font-bold text-slate-900 dark:text-white">{txCurrency === 'NIO' ? 'C$' : 'USD'}</Text>
+                  </Pressable>
+                </View>
+              </View>
+
+              {txType === 'out' && (
+                <View className="mb-4">
+                  <Text className="text-xs font-bold text-slate-600 dark:text-slate-400 mb-1">Categoría</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
+                    {expenseCategories.map(c => (
+                      <Pressable
+                        key={c.id}
+                        onPress={() => setTxCategoryId(c.id)}
+                        className={`px-4 py-2 mr-2 rounded-lg border-2 ${txCategoryId === c.id ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30' : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800'}`}
+                      >
+                        <Text className={txCategoryId === c.id ? 'text-blue-700 dark:text-blue-400 font-bold' : 'text-slate-700 dark:text-slate-300 font-semibold'}>{c.name}</Text>
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+
+              <View className="mb-6">
+                <Text className="text-xs font-bold text-slate-600 dark:text-slate-400 mb-1">Descripción / Motivo</Text>
+                <TextInput
+                  value={txDescription}
+                  onChangeText={setTxDescription}
+                  placeholder="Ej. Pago de internet..."
+                  placeholderTextColor="#94a3b8"
+                  className="bg-slate-50 dark:bg-slate-800 px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
+                />
+              </View>
+
+              <View className="flex-row gap-3">
+                <Pressable
+                  onPress={() => setIsTxModalVisible(false)}
+                  className="flex-1 py-4 items-center rounded-xl bg-slate-200 dark:bg-slate-800"
+                >
+                  <Text className="font-bold text-slate-700 dark:text-slate-300">Cancelar</Text>
+                </Pressable>
+                <Pressable
+                  onPress={handleRegisterTx}
+                  disabled={isSubmittingTx}
+                  className="flex-1 py-4 items-center rounded-xl bg-blue-600"
+                >
+                  {isSubmittingTx ? <ActivityIndicator color="#fff" /> : <Text className="font-bold text-white">Guardar</Text>}
+                </Pressable>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }

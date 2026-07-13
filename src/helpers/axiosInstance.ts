@@ -1,5 +1,6 @@
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
+import { DeviceEventEmitter } from 'react-native';
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://api.diplebill.com';
 
