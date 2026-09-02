@@ -99,6 +99,7 @@ export default function InvoiceDetailScreen() {
 
   const isCanceled = invoice.invoice_status === 'canceled';
   const isCredit = invoice.invoice_status === 'credit';
+  const isProforma = invoice.invoice_status === 'proforma';
 
   return (
     <SafeAreaView className="flex-1 bg-slate-50 dark:bg-[#0c3460]">
@@ -117,15 +118,15 @@ export default function InvoiceDetailScreen() {
             <Text className="text-slate-900 dark:text-white text-xl font-bold">#{invoice.invoice_number}</Text>
             <View
               className={`px-3 py-1 rounded-full ${
-                isCanceled ? 'bg-red-100 dark:bg-red-500/20' : isCredit ? 'bg-purple-100 dark:bg-purple-500/20' : 'bg-green-100 dark:bg-green-500/20'
+                isCanceled ? 'bg-red-100 dark:bg-red-500/20' : isCredit ? 'bg-purple-100 dark:bg-purple-500/20' : isProforma ? 'bg-amber-100 dark:bg-amber-500/20' : 'bg-green-100 dark:bg-green-500/20'
               }`}
             >
               <Text
                 className={`text-[10px] font-bold uppercase tracking-wider ${
-                  isCanceled ? 'text-red-800 dark:text-red-300' : isCredit ? 'text-purple-800 dark:text-purple-300' : 'text-green-800 dark:text-green-300'
+                  isCanceled ? 'text-red-800 dark:text-red-300' : isCredit ? 'text-purple-800 dark:text-purple-300' : isProforma ? 'text-amber-800 dark:text-amber-300' : 'text-green-800 dark:text-green-300'
                 }`}
               >
-                {isCanceled ? 'Anulado' : isCredit ? 'Crédito' : 'Completado'}
+                {isCanceled ? 'Anulado' : isCredit ? 'Crédito' : isProforma ? 'Proforma' : 'Completado'}
               </Text>
             </View>
           </View>
@@ -242,7 +243,7 @@ export default function InvoiceDetailScreen() {
         )}
 
         {/* Botón de anular factura */}
-        {!isCanceled && (
+        {!isCanceled && !isProforma && (
           <Pressable
             onPress={handleCancelInvoice}
             disabled={canceling}

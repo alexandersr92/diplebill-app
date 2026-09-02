@@ -21,7 +21,7 @@ export function LicenseExpiredOverlay({ message }: Props) {
   };
 
   return (
-    <View style={StyleSheet.absoluteFillObject} className="z-[9999] flex-1 items-center justify-center bg-slate-950/95 px-6">
+    <View style={StyleSheet.absoluteFill} className="z-[9999] flex-1 items-center justify-center bg-slate-950/95 px-6">
       <View className="w-full max-w-sm bg-slate-900 border border-red-900/50 rounded-3xl p-8 items-center shadow-lg">
         <View className="p-4 bg-red-950/40 rounded-full border border-red-800/40 mb-6">
           <Text className="text-red-500 text-3xl font-black">!</Text>

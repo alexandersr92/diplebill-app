@@ -84,6 +84,8 @@ export default function InvoicesScreen() {
         return { bg: 'bg-red-100 dark:bg-red-500/20', text: 'text-red-800 dark:text-red-300', label: 'Anulado' };
       case 'credit':
         return { bg: 'bg-purple-100 dark:bg-purple-500/20', text: 'text-purple-800 dark:text-purple-300', label: 'Crédito' };
+      case 'proforma':
+        return { bg: 'bg-amber-100 dark:bg-amber-500/20', text: 'text-amber-800 dark:text-amber-300', label: 'Proforma' };
       default:
         return { bg: 'bg-gray-100 dark:bg-gray-500/20', text: 'text-gray-800 dark:text-gray-300', label: status };
     }

@@ -43,7 +43,8 @@ import {
   AlertCircle,
   ArrowLeft,
   ArrowRight,
-  CheckCircle
+  CheckCircle,
+  FileText
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useColorScheme } from 'nativewind';
@@ -145,6 +146,15 @@ export default function NuevaVentaScreen() {
           pillBgClass: 'bg-purple-500/20',
           pillTextClass: 'text-purple-300'
         };
+      case 'PROFORMA':
+        return {
+          color: '#eab308',
+          bgClass: 'bg-yellow-600',
+          borderClass: 'border-yellow-500/20',
+          textClass: 'text-yellow-400',
+          pillBgClass: 'bg-yellow-500/20',
+          pillTextClass: 'text-yellow-300'
+        };
       default:
         return {
           color: '#0c85eb',
@@ -244,6 +254,7 @@ export default function NuevaVentaScreen() {
       console.log('customClientName:', customClientName);
     }
     const isCredit = paymentMethod === 'CREDITO';
+    const isProforma = paymentMethod === 'PROFORMA';
     const initialPayment = Number(downPayment);
 
     if (isCredit && isNaN(initialPayment)) {
@@ -270,7 +281,9 @@ export default function NuevaVentaScreen() {
     });
 
     let metadata: any = {};
-    if (!isCredit) {
+    if (isProforma) {
+      metadata = {};
+    } else if (!isCredit) {
       if (paymentMethod === 'TRANSFER') {
         metadata = {
           bank: transferBank,
@@ -304,11 +317,13 @@ export default function NuevaVentaScreen() {
       discount: totalDiscount,
       tax: 0,
       grand_total: totalAmount,
-      payment_method: isCredit ? 'CASH' : paymentMethod,
+      payment_method: isProforma ? 'PROFORMA' : (isCredit ? 'CASH' : paymentMethod),
       payment_date: new Date().toISOString().split('T')[0],
       isCredit,
+      is_proforma: isProforma,
+      invoice_status: isProforma ? 'proforma' : undefined,
       init_payment: isCredit ? initialPayment : 0,
-      cash_session_id: activeSession ? activeSession.id : null,
+      cash_session_id: (isProforma || !activeSession) ? null : activeSession.id,
       payment_metadata: metadata,
       products: invoiceProducts
     };
@@ -405,7 +420,8 @@ export default function NuevaVentaScreen() {
 
     // Validaciones de montos y campos según forma de pago
     const isCredit = paymentMethod === 'CREDITO';
-    if (!isCredit) {
+    const isProforma = paymentMethod === 'PROFORMA';
+    if (!isCredit && !isProforma) {
       if (totalPaid < totalAmount - 0.01) {
         Alert.alert(
           'Monto Insuficiente',
@@ -866,6 +882,12 @@ export default function NuevaVentaScreen() {
                           label: 'Crédito',
                           icon: Landmark,
                           colorClass: 'bg-purple-600'
+                        },
+                        {
+                          key: 'PROFORMA',
+                          label: 'Proforma',
+                          icon: FileText,
+                          colorClass: 'bg-yellow-600'
                         }
                       ].map((method) => {
                         const isSelected = paymentMethod === method.key;
@@ -1125,8 +1147,24 @@ export default function NuevaVentaScreen() {
                         </View>
                       )}
 
+                        {paymentMethod === 'PROFORMA' && (
+                          <View className="bg-slate-50 dark:bg-white/5 p-4 rounded-2xl border border-yellow-500/20 mb-4">
+                            <View className="gap-2.5 p-1">
+                              <View className="flex-row items-center gap-2 mb-1">
+                                <FileText size={18} color={isDark ? "#fbbf24" : "#d97706"} />
+                                <Text className="text-yellow-600 dark:text-yellow-300 text-xs font-black uppercase tracking-wider">
+                                  Cotización Proforma
+                                </Text>
+                              </View>
+                              <Text className="text-slate-600 dark:text-slate-300 text-xs leading-relaxed">
+                                Se generará un documento de cotización/proforma. No se descontará stock ni se afectará el balance de caja.
+                              </Text>
+                            </View>
+                          </View>
+                        )}
+
                       {/* GLOBAL TOTAL PANEL (Solo visible en Contado) */}
-                      {paymentMethod !== 'CREDITO' && (
+                      {paymentMethod !== 'CREDITO' && paymentMethod !== 'PROFORMA' && (
                         <View
                           className={`p-4 rounded-2xl border mt-4 ${
                             totalPaid >= totalAmount
